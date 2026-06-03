@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meesho Autofill Tool</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>MEESHO</h1>
+        <p>AUTOFILL TOOL</p>
+      </div>
+
+      <div class="section">
+        <div class="section-label">[ SELECT PROFILE ]</div>
+        <select id="profileSelect" class="select-input">
+          <option value="">Select Profile</option>
+        </select>
+        <div class="button-group">
+          <button id="newBtn" class="btn">+ NEW</button>
+          <button id="editBtn" class="btn">EDIT</button>
+          <button id="delBtn" class="btn">DEL</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <button id="startCaptureBtn" class="btn btn-primary">
+          ▶ START CAPTURE
+        </button>
+        <button
+          id="stopCaptureBtn"
+          class="btn"
+          style="background: #f44336; color: white"
+        >
+          ■ STOP CAPTURE
+        </button>
+        <p id="captureCount" style="font-size: 12px; margin-top: 8px">
+          Fields captured: 0
+        </p>
+      </div>
+
+      <div class="section">
+        <button id="autofillBtn" class="btn btn-success">▶▶ AUTOFILL</button>
+      </div>
+
+      <div class="section">
+        <div class="section-label">[ PROFILE BACKUP ]</div>
+        <button id="exportBtn" class="btn">↓ EXPORT</button>
+        <button id="importBtn" class="btn">↑ IMPORT</button>
+        <input
+          type="file"
+          id="importFile"
+          accept=".json"
+          style="display: none"
+        />
+      </div>
+
+      <div class="footer">
+        <p>POWERED BY ECOMOST.COM</p>
+      </div>
+    </div>
+
+    <div id="profileModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">New Profile</h2>
+        <input
+          type="text"
+          id="profileName"
+          placeholder="Profile Name"
+          class="input"
+        />
+        <button id="saveProfileBtn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
