@@ -156,53 +156,82 @@ class FormFiller {
   static async triggerCustomSelect(element, value) {
     try {
       this.addHighlight(element);
-      await this.sleep(300);
+      await this.sleep(200);
 
-      element.click();
-      await this.sleep(400);
-
-      const input = element.querySelector("input");
-      if (input) {
-        input.value = value;
-        input.focus();
-        ["input", "change"].forEach((eventName) => {
-          const event = new Event(eventName, {
-            bubbles: true,
-            cancelable: true,
-          });
-          input.dispatchEvent(event);
-        });
-        await this.sleep(400);
-      }
-
-      const optionSelectors = [
-        '[role="option"]',
-        "li",
-        'div[class*="option"]',
-        'div[class*="item"]',
-        'div[class*="menu"] div',
-      ];
-
-      let options = [];
-      for (const sel of optionSelectors) {
-        options = document.querySelectorAll(sel);
-        if (options.length > 0) break;
-      }
-
-      if (options.length > 0) {
-        for (const option of options) {
-          const text = option.textContent?.toLowerCase() || "";
-          if (text.includes(value.toLowerCase())) {
-            this.addHighlight(option);
-            await this.sleep(200);
-            option.click();
-            await this.sleep(200);
+      // 1. Find the dropdown trigger (combobox wrapper)
+      let dropdownTrigger = element;
+      // If element is input, find parent combobox or div wrapper
+      if (
+        element.tagName.toLowerCase() === "input" ||
+        element.getAttribute("role") !== "combobox"
+      ) {
+        let temp = element;
+        for (let i = 0; i < 10; i++) {
+          // go up 10 levels max
+          if (!temp.parentElement) break;
+          temp = temp.parentElement;
+          if (
+            temp.getAttribute("role") === "combobox" ||
+            (temp.className &&
+              (temp.className.includes("MuiInputBase-root") ||
+                temp.className.includes("MuiFormControl-root")))
+          ) {
+            dropdownTrigger = temp;
             break;
           }
         }
       }
 
-      document.body.click();
+      // 2. Click the trigger to open menu
+      dropdownTrigger.click();
+      await this.sleep(300);
+
+      // 3. Look for visible options
+      const options = Array.from(
+        document.querySelectorAll('[role="option"], li, .dropdown-item'),
+      );
+
+      // 4. Try to find exact match first
+      const exactOption = options.find(
+        (el) => el.textContent.trim().toLowerCase() === value.toLowerCase(),
+      );
+
+      if (exactOption) {
+        this.addHighlight(exactOption);
+        await this.sleep(150);
+        exactOption.click();
+      } else {
+        // 5. Fallback: Type in search input
+        const inputField = dropdownTrigger.querySelector("input");
+        if (inputField) {
+          // Use native setter
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            "value",
+          )?.set;
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(inputField, value);
+          } else {
+            inputField.value = value;
+          }
+          // Fire events for React
+          inputField.dispatchEvent(new Event("input", { bubbles: true }));
+          inputField.dispatchEvent(new Event("change", { bubbles: true }));
+          await this.sleep(400);
+
+          // 6. Re-search filtered options and click first
+          const filteredOptions = Array.from(
+            document.querySelectorAll('[role="option"], li'),
+          );
+          const firstResult = filteredOptions[0];
+          if (firstResult) {
+            this.addHighlight(firstResult);
+            await this.sleep(150);
+            firstResult.click();
+          }
+        }
+      }
+
       await this.sleep(200);
       this.removeHighlight(element);
     } catch (e) {
@@ -216,7 +245,7 @@ class FormFiller {
       let element = document.querySelector(fieldData.selector);
       if (!element) {
         const allInputs = document.querySelectorAll(
-          'input, textarea, select, [role="combobox"], div[class*="select"], div[class*="dropdown"]',
+          'input, textarea, select, [role="combobox"], div[class*="select"], div[class*="dropdown"], div[class*="Mui"]',
         );
         for (const el of allInputs) {
           const label = SelectorEngine.findLabelForInput(el);
@@ -253,7 +282,9 @@ class FormFiller {
       } else if (
         element.getAttribute("role") === "combobox" ||
         element.className.includes("select") ||
-        element.className.includes("dropdown")
+        element.className.includes("dropdown") ||
+        element.className.includes("Mui") ||
+        element.querySelector("input") !== null // if div contains input, treat as custom select
       ) {
         await this.triggerCustomSelect(element, fieldData.value);
       } else {
@@ -532,8 +563,8 @@ function startCapture() {
 function stopCapture() {
   if (!isCapturing) return;
   isCapturing = false;
-  
-  console.log('Stop capture called! Captured fields:', capturedFields);
+
+  console.log("Stop capture called! Captured fields:", capturedFields);
 
   removePageOverlay();
   document.removeEventListener("mouseover", handleMouseOver, true);
@@ -554,28 +585,35 @@ function stopCapture() {
 
   // Save to storage temporarily
   chrome.storage.local.set({ tempCapturedData: capturedFields }, () => {
-    console.log('✅ Saved temp data to chrome.storage:', capturedFields);
+    console.log("✅ Saved temp data to chrome.storage:", capturedFields);
   });
 
   // Send to popup
   try {
-    chrome.runtime.sendMessage({
-      action: "captureComplete",
-      data: capturedFields,
-    }, (response) => {
-      console.log('Message sent, response from popup:', response);
-    });
+    chrome.runtime.sendMessage(
+      {
+        action: "captureComplete",
+        data: capturedFields,
+      },
+      (response) => {
+        console.log("Message sent, response from popup:", response);
+      },
+    );
   } catch (e) {
     console.log("Popup not open, but temp data is saved!");
   }
 
-  showToast(`Capture complete! ${capturedFields.length} fields captured - please open extension to save!`);
+  showToast(
+    `Capture complete! ${capturedFields.length} fields captured - please open extension to save!`,
+  );
 
   // Show a direct alert
   if (capturedFields.length > 0) {
-    alert(`✅ Successfully captured ${capturedFields.length} fields! Now open the extension popup to save them to your profile!`);
+    alert(
+      `✅ Successfully captured ${capturedFields.length} fields! Now open the extension popup to save them to your profile!`,
+    );
   } else {
-    alert('⚠️ No fields were captured!');
+    alert("⚠️ No fields were captured!");
   }
 
   return capturedFields;
